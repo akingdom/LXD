@@ -5,7 +5,7 @@
   efficient exchange of structured data in UTF-8 text format. Unlike JSON, LXD is not intended for human 
   readability but serves as a streamlined communication protocol between clients and servers. It utilizes 
   uncommon Unicode characters for delimiters and incorporates type prefixes to clearly specify data types.
-  See !lxd.md
+  See ReadMe.md (alias !lxd.md)
   Author: Andrew Kingdom 2024
   License: MIT
 */
