@@ -1,6 +1,6 @@
 /*
   LXD (Lightweight Exchange of Data) Format:
-  See !lxd.md
+  See ReadMe.md (alias !lxd.md)
   Author: Andrew Kingdom 2024
   License: MIT
 */
