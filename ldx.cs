@@ -11,6 +11,7 @@
 */
 
 using System.Collections;
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 
@@ -335,13 +336,13 @@ public static class LXD
     private const char RecordEnd = '╼';     // U+257C
     private const char FieldDelimiter = '╽';// U+257D
     private const char KeyValueSeparator = '꞉'; // U+A789
-    public static bool debug = false;
-    public static string Serialize<T>(T value) where T : notnull
+    public static bool Debug = false;
+    public static string Serialize<T>(T value, bool? debug = null) where T : notnull
     {
         StringBuilder sb = new StringBuilder();
         SerializeValue(new LxdVar(value), sb); // Serialize with LxdVar constructor
         string result = sb.ToString();
-        if (debug) Console.WriteLine($"•> {result}");
+        if (debug != null ? debug == true : Debug == true) Console.WriteLine($"•> {result}");
         return result;
     }
 
@@ -457,9 +458,9 @@ public static class LXD
         sb.Append(RecordEnd);
     }
 
-    public static LxdVar Deserialize(string input)
+    public static LxdVar Deserialize(string input, bool? debug = null)
     {
-        if (debug) Console.WriteLine($"•<- {input}");
+        if (debug != null ? debug == true : Debug == true) Console.WriteLine($"•<- {input}");
         var index = 0;
         return DeserializeValue(typeof(LxdVar), input, ref index);
     }
