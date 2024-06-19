@@ -14,6 +14,8 @@ using System.Collections;
 using System.Globalization;
 using System.Text;
 
+// LxdVar is a dynamic type with the aim to act similarly to how JavaScript works.
+// In some cases this requires casting from LxdVar to a specific type (e.g. foreach loop on a List<> wrapped in LxdVar).
 public class LxdVar : IList<LxdVar>, IDictionary<string, LxdVar>, IEnumerable<KeyValuePair<string, LxdVar>>
 {
 private object _value;
