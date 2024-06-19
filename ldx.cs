@@ -10,32 +10,40 @@
   License: MIT
 */
 
-using System;
 using System.Collections;
 using System.Globalization;
 using System.Text;
 
-public class LxdVar
+public class LxdVar : IList<LxdVar>, IDictionary<string, LxdVar>, IEnumerable<KeyValuePair<string, LxdVar>>
 {
+private object _value;
+
     public char TypeLetter { get; private set; }
-    public object Value { get; private set; }
+    public object Value
+    {
+        get => _value;
+        private set
+        {
+            _value = value;
+            TypeLetter = DetermineTypeLetter(_value);
+        }
+    }
+    // Strict -- if true, an error is raised if attempting to assign this variable to a strictly different type.
     public bool Strict { get; set; }
 
-    // Strict -- if true, an error is raised if attempting to assign this variable to a strictly different type.
     public LxdVar(object value, bool? strict = null)
     {
-        if (value is LxdVar)
+        if (value is LxdVar lxdVar)
         {
-            LxdVar lxdVar = (LxdVar)value;
-            Value = lxdVar.Value;
-            TypeLetter = lxdVar.TypeLetter;
-            Strict = strict ?? lxdVar.Strict;
+            _value = lxdVar.Value;
+            TypeLetter = DetermineTypeLetter(_value);
+            Strict = strict ?? lxdVar.Strict;  // inherit strictness if not specified (important)
         }
         else
         {
-            Value = value;
+            _value = value;
+            TypeLetter = DetermineTypeLetter(_value);
             Strict = strict ?? false;
-            TypeLetter = DetermineTypeLetter(value);
         }
     }
 
@@ -70,6 +78,7 @@ public class LxdVar
     public static implicit operator LxdVar(DateTime value) => new LxdVar(value);
     public static implicit operator LxdVar(Dictionary<string, LxdVar> value) => new LxdVar(value);
     public static implicit operator LxdVar(List<LxdVar> value) => new LxdVar(value);
+
     public static implicit operator string(LxdVar lxdVar) => lxdVar.As<string>();
     public static implicit operator int(LxdVar lxdVar) => lxdVar.As<int>();
     public static implicit operator float(LxdVar lxdVar) => lxdVar.As<float>();
@@ -78,9 +87,244 @@ public class LxdVar
     public static implicit operator Dictionary<string, LxdVar>(LxdVar lxdVar) => lxdVar.As<Dictionary<string, LxdVar>>();
     public static implicit operator List<LxdVar>(LxdVar lxdVar) => lxdVar.As<List<LxdVar>>();
 
-
     public override string ToString() => Value?.ToString() ?? "null";
 
+    #region IList<LxdVar> AND IDictionary<string, LxdVar> shared implementation
+
+    private InvalidOperationException InvalidListOrDictionary()
+    {
+        if (Value is IList)
+            return new InvalidOperationException("The list contains non-LxdVar elements.");
+        else if (Value is IDictionary)
+            return new InvalidOperationException("The dictionary contains non-LxdVar elements.");
+        else
+        {
+            string type = Value?.GetType().ToString() ?? "null";
+            return new InvalidOperationException($"{type} value is not a recognized list or dictionary");
+        }
+    }
+    
+    // IsReadOnly - IList, IDictionary
+    public bool IsReadOnly => false;
+
+    // Clear - IList, IDictionary
+    public void Clear() {
+        if (Value is IList<LxdVar> list)
+            list.Clear();
+        else if (Value is IDictionary<string, LxdVar> dictionary)
+            dictionary.Clear();
+        else throw InvalidListOrDictionary();
+    }
+    
+    // Count - ICollection (IList, IDictionary)
+    public int Count
+    {
+        get
+        {
+            if (Value is IList<LxdVar> list)
+                return list.Count;
+            else if (Value is IDictionary<string, LxdVar> dictionary)
+                return dictionary.Count;
+            else throw InvalidListOrDictionary();
+        }
+    }
+
+    #endregion
+    #region IList<LxdVar> implementation
+
+    public LxdVar this[int index]
+    {
+        get => EnsureList()[index];
+        set => EnsureList()[index] = value;
+    }
+
+    private IList<LxdVar> EnsureList()
+    {
+        if (Value is IList<LxdVar> list)
+            return list;
+        if (Value is IList)
+            throw new InvalidOperationException("The list contains non-LxdVar elements.");
+
+        string type = Value?.GetType().ToString() ?? "null";
+        throw new InvalidOperationException($"{type} is not a recognised list");
+    }
+
+    public void Add(LxdVar item) => EnsureList().Add(item);
+
+    public bool Contains(LxdVar item) => EnsureList().Contains(item);
+
+    // CopyTo - ICollection (IList)
+    public void CopyTo(LxdVar[] array, int arrayIndex) => EnsureList().CopyTo(array, arrayIndex);
+    
+    public int IndexOf(LxdVar item) => EnsureList().IndexOf(item);
+
+    public void Insert(int index, LxdVar item) => EnsureList().Insert(index, item);
+
+    public bool Remove(LxdVar item) => EnsureList().Remove(item);
+
+    public void RemoveAt(int index) => EnsureList().RemoveAt(index);
+
+    #endregion
+    #region IDictionary<string, LxdVar> implementation
+
+    public LxdVar this[string key]
+    {
+        get => EnsureDictionary()[key];
+        set => EnsureDictionary()[key] = value;
+    }
+
+    private IDictionary<string, LxdVar> EnsureDictionary()
+    {
+        if (Value is IDictionary<string, LxdVar> dictionary)
+            return dictionary;
+
+        if (Value is IDictionary)
+            throw new InvalidOperationException("The dictionary contains non-LxdVar elements.");
+
+        throw new InvalidOperationException("Not a dictionary");
+    }
+
+    public ICollection<string> Keys => EnsureDictionary().Keys;
+
+    public ICollection<LxdVar> Values => EnsureDictionary().Values;
+
+    
+    public void Add(string key, LxdVar value) => EnsureDictionary().Add(key, value);
+    public void Add(KeyValuePair<string, LxdVar> item) => EnsureDictionary().Add(item.Key, item.Value);
+
+    public bool ContainsKey(string key) => EnsureDictionary().ContainsKey(key);
+    public bool Contains(KeyValuePair<string, LxdVar> item) => EnsureDictionary().Contains(item);
+
+    public void CopyTo(KeyValuePair<string, LxdVar>[] array, int arrayIndex) => EnsureDictionary().CopyTo(array, arrayIndex);
+
+    public bool Remove(string key) => EnsureDictionary().Remove(key);
+    public bool Remove(KeyValuePair<string, LxdVar> item) => EnsureDictionary().Remove(item);
+
+    public bool TryGetValue(string key, out LxdVar value)
+    {
+        bool result = EnsureDictionary().TryGetValue(key, out var tempValue);
+        value = tempValue ?? throw new KeyNotFoundException(); // Assign a non-null value or handle null appropriately
+        return result;
+    }
+
+    // Explicit implementation for IEnumerator<KeyValuePair<string, LxdVar>>
+    IEnumerator<KeyValuePair<string, LxdVar>> IEnumerable<KeyValuePair<string, LxdVar>>.GetEnumerator() => EnsureDictionary().GetEnumerator();
+    
+    #endregion
+
+    #region Custom Enumerator for IList<LxdVar>
+
+    // Custom enumerator for IEnumerator<LxdVar>
+    public IEnumerator<LxdVar> GetEnumerator()
+    {
+        return new LxdVarEnumerator(this);
+    }
+    
+    // Explicit implementation of IEnumerable.GetEnumerator() for IEnumerator<LxdVar>
+    IEnumerator IEnumerable.GetEnumerator()
+    {
+        return GetEnumerator();
+    }
+
+    // Custom enumerator ennumerates 'Value' within the LxdVar class.
+    // It supports Dictionary, List and String type of Value.
+    private class LxdVarEnumerator : IEnumerator<LxdVar>
+    {
+        private IEnumerator _innerEnumerator;
+
+        public LxdVarEnumerator(LxdVar lxdVar)
+        {
+            if (lxdVar.Value is IList<LxdVar> list)
+                _innerEnumerator = list.GetEnumerator();
+            else if (lxdVar.Value is IDictionary<string, LxdVar> dictionary)
+                _innerEnumerator = dictionary.Values.GetEnumerator();
+            else if (lxdVar.Value is string str)
+                _innerEnumerator = new StringEnumerator(str);
+            else
+                throw lxdVar.InvalidListOrDictionary();
+        }
+
+        public LxdVar Current => GetValueFromEnumerator(_innerEnumerator);
+
+        object IEnumerator.Current => GetValueFromEnumerator(_innerEnumerator);
+
+        public void Dispose()
+        {
+            if (_innerEnumerator is IDisposable disposable)
+                disposable.Dispose();
+        }
+
+        public bool MoveNext() => _innerEnumerator.MoveNext();
+
+        public void Reset() => _innerEnumerator.Reset();
+
+        private LxdVar GetValueFromEnumerator(IEnumerator innerEnumerator)
+        {
+            return innerEnumerator switch
+            {
+                IEnumerator<LxdVar> enumerator => (LxdVar)enumerator.Current,
+                CharEnumerator charEnumerator => new LxdVar(charEnumerator.Current.ToString()),
+                _ => throw new InvalidOperationException("Unsupported enumerator type."),
+            };
+        }
+
+        private class StringEnumerator : IEnumerator
+        {
+            private readonly string _str;
+            private int _index;
+
+            public StringEnumerator(string str)
+            {
+                _str = str;
+                _index = -1;
+            }
+
+            public object Current => new LxdVar(_str[_index].ToString());
+
+            public bool MoveNext()
+            {
+                _index++;
+                return _index < _str.Length;
+            }
+
+            public void Reset()
+            {
+                _index = -1;
+            }
+        }
+    }
+
+    // Custom enumerator for KeyValuePair<string, LxdVar> as distinct from the above
+    private class LxdVarKeyValuePairEnumerator : IEnumerator<KeyValuePair<string, LxdVar>>
+    {
+        private IEnumerator<KeyValuePair<string, LxdVar>> _innerEnumerator;
+
+        public LxdVarKeyValuePairEnumerator(IDictionary<string, LxdVar> dictionary)
+        {
+            _innerEnumerator = dictionary.GetEnumerator();
+        }
+
+        public KeyValuePair<string, LxdVar> Current => _innerEnumerator.Current;
+
+        object IEnumerator.Current => _innerEnumerator.Current;
+
+        public void Dispose()
+        {
+            _innerEnumerator.Dispose();
+        }
+
+        public bool MoveNext()
+        {
+            return _innerEnumerator.MoveNext();
+        }
+
+        public void Reset()
+        {
+            _innerEnumerator.Reset();
+        }
+    }
+
+    #endregion
 }
 
 public static class LXD
@@ -90,10 +334,10 @@ public static class LXD
     private const char FieldDelimiter = '╽';// U+257D
     private const char KeyValueSeparator = '꞉'; // U+A789
 
-    public static string Serialize<T>(T value)
+    public static string Serialize<T>(T value) where T : notnull
     {
         StringBuilder sb = new StringBuilder();
-        SerializeValue(new LxdVar(value!), sb);
+        SerializeValue(new LxdVar(value), sb); // Serialize with LxdVar constructor
         string result = sb.ToString();
         Console.WriteLine($"•> {result}");
         return result;
@@ -211,12 +455,20 @@ public static class LXD
         sb.Append(RecordEnd);
     }
 
-    public static T Deserialize<T>(string input)
+    //public static T Deserialize<T>(string input)
+    //{
+    //    Console.WriteLine($"•<- {input}");
+    //    var index = 0;
+    //    return (T)DeserializeValue(typeof(T), input, ref index).Value;
+    //}
+
+    public static LxdVar Deserialize(string input)
     {
         Console.WriteLine($"•<- {input}");
         var index = 0;
-        return (T)DeserializeValue(typeof(T), input, ref index).Value;
+        return DeserializeValue(typeof(LxdVar), input, ref index);
     }
+
 
     private static LxdVar DeserializeValue(Type expectedType, string input, ref int index)
     {
