@@ -335,13 +335,13 @@ public static class LXD
     private const char RecordEnd = '╼';     // U+257C
     private const char FieldDelimiter = '╽';// U+257D
     private const char KeyValueSeparator = '꞉'; // U+A789
-
+    public static bool debug = false;
     public static string Serialize<T>(T value) where T : notnull
     {
         StringBuilder sb = new StringBuilder();
         SerializeValue(new LxdVar(value), sb); // Serialize with LxdVar constructor
         string result = sb.ToString();
-        Console.WriteLine($"•> {result}");
+        if (debug) Console.WriteLine($"•> {result}");
         return result;
     }
 
@@ -457,16 +457,9 @@ public static class LXD
         sb.Append(RecordEnd);
     }
 
-    //public static T Deserialize<T>(string input)
-    //{
-    //    Console.WriteLine($"•<- {input}");
-    //    var index = 0;
-    //    return (T)DeserializeValue(typeof(T), input, ref index).Value;
-    //}
-
     public static LxdVar Deserialize(string input)
     {
-        Console.WriteLine($"•<- {input}");
+        if (debug) Console.WriteLine($"•<- {input}");
         var index = 0;
         return DeserializeValue(typeof(LxdVar), input, ref index);
     }
