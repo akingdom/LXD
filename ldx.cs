@@ -350,89 +350,36 @@ public static class LXD
     {
         if (value is LxdVar lxdVar)
         {
-            SerializeValue(lxdVar.Value, sb); // Recursively serialize LxdVar's inner value
+            SerializeValue(lxdVar.Value, sb); // Unwrap and serialize LxdVar's inner value
             return;
         }
-
-        switch (value)
+        else switch (value)
         {
-            case string s:
-                sb.Append('s');
-                sb.Append(EscapeString(s));
-                break;
-            case int i:
-                sb.Append('i');
-                sb.Append(i.ToString(CultureInfo.InvariantCulture));
-                break;
-            case float f:
-                sb.Append('f');
-                sb.Append(f.ToString(CultureInfo.InvariantCulture));
-                break;
-            case bool b:
-                sb.Append('b');
-                sb.Append(b ? "true" : "false");
-                break;
-            case DateTime dt:
-                sb.Append('d');
-                sb.Append(dt.ToString("O", CultureInfo.InvariantCulture));
-                break;
-            case IList list:
-                sb.Append('L');
-                sb.Append(RecordStart);
-                foreach (var item in list)
-                {
-                    SerializeValue(item, sb);
-                    sb.Append(FieldDelimiter);
-                }
-                sb.Append(RecordEnd);
-                break;
-            case IDictionary<string, object> dict:
-                sb.Append('D');
-                sb.Append(RecordStart);
-                bool isFirst = true;
-                foreach (var kvp in dict)
-                {
-                    if (!isFirst)
-                    {
-                        sb.Append(FieldDelimiter);
-                    }
-                    sb.Append(EscapeString(kvp.Key.ToString()!));
-                    sb.Append(KeyValueSeparator);
-                    SerializeValue(kvp.Value, sb);
-                    isFirst = false;
-                }
-                sb.Append(RecordEnd);
-                break;
-            case IDictionary<string, LxdVar> dict:
-                sb.Append('D'); // Type letter prefix for dictionary
-                sb.Append(RecordStart);
-                isFirst = true;
-                foreach (var kvp in dict)
-                {
-                    if (!isFirst)
-                    {
-                        sb.Append(FieldDelimiter);
-                    }
-                    sb.Append(EscapeString(kvp.Key.ToString()!));
-                    sb.Append(KeyValueSeparator);
-                    SerializeValue(kvp.Value, sb);
-                    isFirst = false;
-                }
-                sb.Append(RecordEnd);
-                break;
+            case string s: SerializeString(s, sb); break;
+            case int i: SerializeInt(i, sb); break;
+            case float f: SerializeFloat(f, sb); break;
+            case bool b: SerializeBool(b, sb); break;
+            case DateTime dt: SerializeDateTime(dt, sb); break;
+            case IList list: SerializeList(list, sb); break;
+            case IDictionary<string, object> dict: SerializeDictionary(dict, sb); break;
+            case IDictionary<string, LxdVar> lxdDict: SerializeLxdDictionary(lxdDict, sb); break;
             default:
                 string type = value?.GetType().ToString() ?? "null";
                 throw new NotSupportedException($"Unsupported type: {type}");
         }
     }
 
-
-    private static void SerializeDictionary(IDictionary<string, LxdVar> data, StringBuilder sb)
+    private static void SerializeLxdDictionary(IDictionary<string, LxdVar> lxdDict, StringBuilder sb)
     {
-        sb.Append('D'); // Type letter prefix for dictionary
+        SerializeDictionary(lxdDict.ToDictionary(kv => kv.Key, kv => kv.Value.Value), sb); // Ensure inner value is serialized
+    }
+
+    private static void SerializeDictionary(IDictionary<string, object> dict, StringBuilder sb)
+    {
+        sb.Append('D');
         sb.Append(RecordStart);
         bool isFirst = true;
-        foreach (var kvp in data)
+        foreach (var kvp in dict)
         {
             if (!isFirst)
             {
@@ -440,23 +387,55 @@ public static class LXD
             }
             sb.Append(EscapeString(kvp.Key.ToString()!));
             sb.Append(KeyValueSeparator);
-            SerializeValue(new LxdVar(kvp.Value!), sb);
+            SerializeValue(kvp.Value, sb);
             isFirst = false;
         }
         sb.Append(RecordEnd);
     }
 
-    private static void SerializeList(IList<LxdVar> list, StringBuilder sb)
+    private static void SerializeList(IList list, StringBuilder sb)
     {
-        sb.Append('L'); // Type letter prefix for list
+        sb.Append('L');
         sb.Append(RecordStart);
         foreach (var item in list)
         {
-            SerializeValue(new LxdVar(item), sb);
+            SerializeValue(item, sb);
             sb.Append(FieldDelimiter);
         }
         sb.Append(RecordEnd);
     }
+
+    private static void SerializeDateTime(DateTime dt, StringBuilder sb)
+    {
+        sb.Append('d');
+        sb.Append(dt.ToString("O", CultureInfo.InvariantCulture));
+    }
+
+    private static void SerializeBool(bool b, StringBuilder sb)
+    {
+        sb.Append('b');
+        sb.Append(b ? "true" : "false");
+    }
+
+    private static void SerializeFloat(float f, StringBuilder sb)
+    {
+        sb.Append('f');
+        sb.Append(f.ToString(CultureInfo.InvariantCulture));
+    }
+
+    private static void SerializeInt(int i, StringBuilder sb)
+    {
+        sb.Append('i');
+        sb.Append(i.ToString(CultureInfo.InvariantCulture));
+    }
+
+    private static void SerializeString(string s, StringBuilder sb)
+    {
+        sb.Append('s');
+        sb.Append(EscapeString(s));
+    }
+
+
 
     public static LxdVar Deserialize(string input, bool? debug = null)
     {
@@ -507,7 +486,7 @@ public static class LXD
                 index++;  // point past KeyValueSeparator
                 while (input[index] != RecordEnd)
                 {
-                    var value = DeserializeValue(expectedType.GetGenericArguments()[0], input, ref index);
+                    var value = DeserializeValue(typeof(LxdVar), input, ref index);
                     list.Add(value);
                     if (input[index] == FieldDelimiter) index++;  // point past FieldDelimiter to either a RecordEnd or type letter prefix
                 }
@@ -528,6 +507,7 @@ public static class LXD
         return input.Substring(start, index - start);
     }
 
+    // Escape control characters using their hex representations -- used to make data distinct from controls.
     private static string EscapeString(string s)
     {
         var sb = new StringBuilder();
@@ -535,14 +515,20 @@ public static class LXD
         {
             if (c == RecordStart || c == RecordEnd || c == FieldDelimiter || c == KeyValueSeparator)
             {
-                sb.AppendFormat("\\x{0:X2}", (int)c);
+                sb.AppendFormat("\\u{0:X4}", (int)c);
             }
             else
             {
                 sb.Append(c);
             }
         }
-        return sb.ToString();
+        return sb.ToString()
+                 .Replace("\\", "\\\\")
+                 .Replace("\r", "\\r")
+                 .Replace("\n", "\\n")
+                 .Replace("\t", "\\t")
+                 .Replace("'", "\\'")
+                 .Replace("\"", "\\\"");
     }
 
     private static string UnescapeString(string s)
@@ -550,11 +536,24 @@ public static class LXD
         var sb = new StringBuilder();
         for (var i = 0; i < s.Length; i++)
         {
-            if (s[i] == '\\' && s[i + 1] == 'x')
+            if (s[i] == '\\' && s[i + 1] == 'u')
             {
-                var hex = s.Substring(i + 2, 2);
+                var hex = s.Substring(i + 2, 4);
                 sb.Append((char)Convert.ToInt32(hex, 16));
-                i += 3; // Skip over the escape sequence
+                i += 5; // Skip over the escape sequence
+            }
+            else if (s[i] == '\\' && s.Length > i + 1)
+            {
+                switch (s[i + 1])
+                {
+                    case '\\': sb.Append('\\'); i++; break;
+                    case 'r': sb.Append('\r'); i++; break;
+                    case 'n': sb.Append('\n'); i++; break;
+                    case 't': sb.Append('\t'); i++; break;
+                    case '\'': sb.Append('\''); i++; break;
+                    case '"': sb.Append('"'); i++; break;
+                    default: sb.Append(s[i]); break;
+                }
             }
             else
             {
