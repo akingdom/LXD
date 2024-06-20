@@ -113,6 +113,11 @@ Use the optional meta structure to define types at the beginning of communicatio
 Conclusion
 LXD offers a streamlined, text-oriented alternative to JSON for structured data exchange. Its use of uncommon Unicode characters and explicit type prefixes makes it a robust choice for efficient client-server communication. By following best practices for handling escape sequences and defining types, LXD can be an effective tool for structured data serialization.
 
+### Future
+- Switch from string-only keys in dictionaries.
+- Fully implement 'strict' mode (e.g. the ability to override strictness when deserialising).
+- Full unit tests.
+
 --
   Author: Andrew Kingdom 2024
   License: MIT
