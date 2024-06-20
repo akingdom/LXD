@@ -9,8 +9,8 @@ LXD (Lightweight Exchange of Data) is a compact and hierarchical serialization f
 
 LXD supports a variety of data types, each with a specific prefix:
 
-Type | Prefix | Example | Note
----- | ------ | ------- | ----
+Type | Prefix | Encoded Example | Note
+---- | ------ | --------------- | ----
 **String** | s | sHello World | 
 **Integer** | i | i123 | 
 **Float** | f | f3.14 | 
@@ -23,12 +23,12 @@ Keys in dictionaries are always untyped strings.
 
 ### Special Delimiters
 
-LXD uses specific Unicode characters as delimiters to structure the data:
+LXD uses specific Unicode characters as delimiters to structure List (array) and Dictionary (object) data:
 
-- **Record Start**: `╾` (U+257E)
-- **Record End**: `╼` (U+257C)
-- **Field Delimiter**: `╽` (U+257D)
-- **Key/Value Separator**: `꞉` (U+A789)
+- **Record Start**: `╾` (U+257E) Marks the start of a list or dictionary, *BOX DRAWINGS HEAVY LEFT AND LIGHT RIGHT*, UTF-8: E2 95 BE
+- **Record End**: `╼` (U+257C) Marks the end of a list or dictionary, *BOX DRAWINGS LIGHT LEFT AND HEAVY RIGHT*, UTF-8: E2 95 BC
+- **Field Delimiter**: `╽` (U+257D) Marks an additional list or dictionary element, *BOX DRAWINGS LIGHT UP AND HEAVY DOWN*, UTF-8: E2 95 BD
+- **Key/Value Separator**: `꞉` (U+A789) Marks the divide between a dictionary element's key and value units, *MODIFIER LETTER COLON*, UTF-8: EA 9E 89
 
 ### Escape Sequences
 
