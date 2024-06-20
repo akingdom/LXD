@@ -5,49 +5,162 @@
   License: MIT
 */
 
-window.LXD = {  // put LXD in global space so it can be accessed directly (LDX === window.LXD).
+// Put LXD in global space so it can be accessed directly (LDX === window.LXD).
+window.LXD = (() => {
+    // private:
 
-    MetaEnd: '\u2B1A',           // U+2B1A BLACK LARGE SQUARE
-    RecordStart: '\u257E',       // U+257E BOX DRAWINGS LIGHT LEFT
-    RecordEnd: '\u257C',         // U+257C BOX DRAWINGS LIGHT LEFT AND RIGHT
-    FieldDelimiter: '\u257D',    // U+257D BOX DRAWINGS LIGHT UP
-    KeyValueSeparator: '\uA789', // U+A789 MODIFIER LETTER COLON
+    // Markers
+    RecordStart = '\u257E';       // U+257E BOX DRAWINGS LIGHT LEFT
+    RecordEnd = '\u257C';         // U+257C BOX DRAWINGS LIGHT LEFT AND RIGHT
+    FieldDelimiter = '\u257D';    // U+257D BOX DRAWINGS LIGHT UP
+    KeyValueSeparator = '\uA789'; // U+A789 MODIFIER LETTER COLON
+
+    const specialChars = [RecordStart, RecordEnd, FieldDelimiter, KeyValueSeparator];
+    const specialCharsMap = {
+        '\u257E': '\\u257E',
+        '\u257C': '\\u257C',
+        '\u257D': '\\u257D',
+        '\uA789': '\\uA789'
+    };
+
+    function serialize(value) {
+        return serializeValue(value);
+    }
+
+    function serializeValue(value) {
+        switch (typeof value) {
+            case 'string':
+                return `s${escapeString(value)}`;
+            case 'number':
+                return Number.isInteger(value) ? `i${value}` : `f${value}`;
+            case 'boolean':
+                return `b${value}`;
+            case 'object':
+                if (value instanceof Date) {
+                    return `d${value.toISOString()}`;
+                } else if (Array.isArray(value)) {
+                    return `L${RecordStart}${value.map(serializeValue).join(FieldDelimiter)}${RecordEnd}`;
+                } else if (value !== null && typeof value === 'object') {
+                    return `D${RecordStart}${Object.entries(value).map(([k, v]) => `${escapeString(k)}${KeyValueSeparator}${serializeValue(v)}`).join(FieldDelimiter)}${RecordEnd}`;
+                } else {
+                    throw new Error(`Unsupported type: ${typeof value}`);
+                }
+            default:
+                throw new Error(`Unsupported type: ${typeof value}`);
+        }
+    }
+
+    function deserialize(input) {
+        let index = 0;
+        return deserializeValue(input, index).value;
+    }
+
+    function deserializeValue(input, index) {
+        const typeLetter = input[index++];
+        switch (typeLetter) {
+            case 's':
+                const strData = readUntil(input, index, FieldDelimiter, RecordEnd);
+                const str = unescapeString(strData.value);
+                index = strData.newIndex;
+                return { value: str, newIndex: index };
+            case 'i':
+                const intData = readUntil(input, index, FieldDelimiter, RecordEnd);
+                const intValue = parseInt(unescapeString(intData.value), 10);  // base-10
+                index = intData.newIndex;
+                return { value: intValue, newIndex: index };
+            case 'f':
+                const floatData = readUntil(input, index, FieldDelimiter, RecordEnd);
+                const floatValue = parseFloat(unescapeString(floatData.value));
+                index = floatData.newIndex;
+                return { value: floatValue, newIndex: index };
+            case 'b':
+                const boolData = readUntil(input, index, FieldDelimiter, RecordEnd);
+                const boolValue = unescapeString(boolData.value) === "true";
+                index = boolData.newIndex;
+                return { value: boolValue, newIndex: index };
+            case 'd':
+                const dateData = readUntil(input, index, FieldDelimiter, RecordEnd);
+                const dateValue = new Date(unescapeString(dateData.value));
+                index = dateData.newIndex;
+                return { value: dateValue, newIndex: index };
+            case 'D':
+                let dictionary = {};
+                if (input[index] !== RecordStart) {
+                    throw new Error("Invalid format: RecordStart expected");
+                }
+                index++;  // Skip RecordStart, point to first data char (or RecordEnd)
+                while (index < input.length && input[index] !== RecordEnd) {
+                    // Get key
+                    const { value: escapedKey, newIndex: nextIndex } = readUntil(input, index, KeyValueSeparator);
+                    index = nextIndex;
+                    index++;  // Skip KeyValueSeparator, point to value type letter
+                    const key = unescapeString(escapedKey);
+                    // Get value
+                    let valueField = deserializeValue(input, index);
+                    dictionary[key] = valueField.value;
+                    index = valueField.newIndex; // Update index to newIndex after deserialization
+                    // Skip FieldDelimiter, point to next field (if present)
+                    if (input[index] === FieldDelimiter) {
+                        index++;
+                    }
+                }
+                if (index >= input.length) {
+                    throw new Error("Invalid format: RecordEnd expected");
+                }
+                index++;  // Skip RecordEnd
+                return { value: dictionary, newIndex: index };
+            case 'L':
+                let list = [];
+                if (input[index] !== RecordStart) {
+                    throw new Error("Invalid format: RecordStart expected");
+                }
+                index++; // Skip RecordStart, point to first data char (or RecordEnd)
+                while (index < input.length && input[index] !== RecordEnd) {
+                    let valueField = deserializeValue(input, index);
+                    list.push(valueField.value);
+                    index = valueField.newIndex;
+                    if (input[index] === FieldDelimiter) {
+                        index++;
+                    }
+                }
+                if (index >= input.length) {
+                    throw new Error("Invalid format: RecordEnd expected");
+                }
+                index++;  // point past RecordEnd
+                return { value: list, newIndex: index };
+            default:
+                throw new Error(`Invalid format: Unsupported type letter: ${typeLetter}`);
+        }
+    }
+
+    function readUntil(input, index, ...delimiters) {
+        const start = index;
+        while (index < input.length && !delimiters.includes(input[index])) {
+            index++;
+        }
+        return { value: input.substring(start, index), newIndex: index };
+    }
 
     // Escape control characters using their hex representations -- used to make data distinct from controls.
-    escapeString: function (str) {
-        return str.replace(this.lxdSpecialCharsPattern, char => {
-            switch (char) {
-                case this.MetaEnd:
-                    return '\\u2B1A';
-                case this.RecordStart:
-                    return '\\u257E';
-                case this.RecordEnd:
-                    return '\\u257C';
-                case this.FieldDelimiter:
-                    return '\\u257D';
-                case this.KeyValueSeparator:
-                    return '\\uA789';
-                default:
-                    return char;
-            }
-        }).replace(/\\/g, '\\\\')
+    function escapeString(str) {
+        return str.replace(/[\u257E\u257C\u257D\uA789]/g, char => specialCharsMap[char])
+            .replace(/\\/g, '\\\\')
             .replace(/\r/g, '\\r')
             .replace(/\n/g, '\\n')
             .replace(/\t/g, '\\t')
             .replace(/'/g, "\\'")
             .replace(/"/g, '\\"');
-    },
+    }
 
-    // Unescape hex and common escape sequences -- used to restore escaped data.
-    unescapeString: function (str) {
+    // Unescape unicode, hex and common escape sequences -- used to restore escaped data.
+    function unescapeString(str) {
         if (typeof str !== 'string') {
-            throw new TypeError('Input must be a string');
+            throw new TypeError(`Input must be a string (not ${typeof str})`);
         }
-        return str.replace(/\\u2B1A/g, this.MetaEnd)
-            .replace(/\\u257E/g, this.RecordStart)
-            .replace(/\\u257C/g, this.RecordEnd)
-            .replace(/\\u257D/g, this.FieldDelimiter)
-            .replace(/\\uA789/g, this.KeyValueSeparator)
+        return str.replace(/\\u257E/g, RecordStart)
+            .replace(/\\u257C/g, RecordEnd)
+            .replace(/\\u257D/g, FieldDelimiter)
+            .replace(/\\uA789/g, KeyValueSeparator)
             .replace(/\\\\/g, '\\')
             .replace(/\\r/g, '\r')
             .replace(/\\n/g, '\n')
@@ -56,175 +169,11 @@ window.LXD = {  // put LXD in global space so it can be accessed directly (LDX =
             .replace(/\\"/g, '"')
             .replace(/\\x([0-9A-Fa-f]{2})/g, (match, p1) => String.fromCharCode(parseInt(p1, 16)))
             .replace(/\\u([0-9A-Fa-f]{4})/g, (match, p1) => String.fromCharCode(parseInt(p1, 16)));
-    },
-
-    serialize: function (data) {
-        let result = this.serializeDictionary(data);
-        return result;
-    },
-
-    serializeDictionary: function (dict) {
-        let result = 'D' + this.RecordStart; // Type letter prefix for dictionary
-        const entries = Object.entries(dict);
-        for (let i = 0; i < entries.length; i++) {
-            const [key, value] = entries[i];
-            result += `${this.escapeString(key)}${this.KeyValueSeparator}${this.serializeValue(value)}`;
-            if (i < entries.length - 1) {
-                result += this.FieldDelimiter;
-            }
-        }
-        result += this.RecordEnd;
-        return result;
-    },
-
-    serializeValue: function (value) {
-        if (typeof value === 'string') {
-            return 's' + this.escapeString(value); // Type letter prefix for string
-        } else if (typeof value === 'number') {
-            if (Number.isInteger(value)) {
-                return 'i' + value;
-            } else {
-                return 'f' + value;
-            }
-        } else if (typeof value === 'boolean') {
-            return 'b' + (value ? 'true' : 'false');
-        } else if (value instanceof Date) {
-            return 'd' + value.toISOString(); // ISO 8601 format
-        } else if (Array.isArray(value)) {
-            return this.serializeList(value);
-        } else if (typeof value === 'object') {
-            return this.serializeDictionary(value);
-        } else {
-            throw new Error(`Unsupported type: ${typeof value}`);
-        }
-    },
-
-    serializeList: function (list) {
-        let result = 'L' + this.RecordStart; // Type letter prefix for list
-        for (let item of list) {
-            result += `${this.serializeValue(item)}${this.FieldDelimiter}`;
-        }
-        result += this.RecordEnd;
-        return result;
-    },
-
-    deserialize: function (input) {
-        debugger;
-        let index = 0;
-        let result = this.deserializeValue(input, index);
-        //let index = result.newIndex; -- we don't need to update index at the root data level 
-        return result.value;
-    },
-
-    deserializeValue: function (input, index) {
-        let result, str; // Define result and str once outside the switch statement
-        switch (input[index]) {
-            // Primatives...
-            case 's':
-                index++; // Skip type letter prefix
-                result = this.readUntil(input, index, this.FieldDelimiter, this.RecordEnd);
-                str = result.value;
-                index = result.newIndex;
-                return { value: this.unescapeString(str), newIndex: index };
-            case 'i':
-                index++; // Skip type letter prefix
-                result = this.readUntil(input, index, this.FieldDelimiter, this.RecordEnd);
-                str = result.value;
-                index = result.newIndex;
-                return { value: parseInt(str), newIndex: index };
-            case 'f':
-                index++; // Skip type letter prefix
-                result = this.readUntil(input, index, this.FieldDelimiter, this.RecordEnd);
-                str = result.value;
-                index = result.newIndex;
-                return { value: parseFloat(str), newIndex: index };
-            case 'b':
-                index++; // Skip type letter prefix
-                result = this.readUntil(input, index, this.FieldDelimiter, this.RecordEnd);
-                str = result.value;
-                index = result.newIndex;
-                return { value: str === "true", newIndex: index };
-            case 'd':
-                index++; // Skip type letter prefix
-                result = this.readUntil(input, index, this.FieldDelimiter, this.RecordEnd);
-                str = result.value;
-                index = result.newIndex;
-                return { value: new Date(str), newIndex: index };
-            // Objects...
-            case 'D':
-                return this.deserializeDictionary(input, index); // Increment index for dictionary
-            case 'L':
-                return this.deserializeList(input, index); // Increment index for list
-            default:
-                throw new Error("Invalid format: Unknown type letter prefix");
-        }
-    },
-
-    deserializeDictionary: function (input, index) {
-        if (input[index] !== 'D') // Check type letter prefix
-            throw new Error("Invalid format: Type letter prefix for dictionary expected");
-
-        index++; // point to RecordStart char
-        let result = {};
-        if (input[index] !== this.RecordStart)
-            throw new Error("Invalid format: RecordStart expected");
-
-        index++;  // point to first data char (or RecordEnd)
-        while (index < input.length && input[index] !== this.RecordEnd) {
-            // Get key
-            let { value: key, newIndex: nextIndex } = this.readUntil(input, index, this.KeyValueSeparator);
-            index = nextIndex + 1;
-            // Get value
-            let { value, newIndex } = this.deserializeValue(input, index);
-            result[key] = value;
-            index = newIndex; // Update index to newIndex after deserialization
-            // Next field (if present)
-            if (input[index] === this.FieldDelimiter)
-                index++;
-        }
-        if (index >= input.length)
-            throw new Error("Invalid format: RecordEnd expected");
-
-        index++;  // point past RecordEnd
-        return { value: result, newIndex: index };
-    },
-
-    deserializeList: function (input, index) {
-        if (input[index] !== 'L') // Check type letter prefix
-            throw new Error("Invalid format: Type letter prefix for list expected");
-
-        index++; // point to RecordStart char
-        let result = [];
-        if (input[index] !== this.RecordStart)
-            throw new Error("Invalid format: RecordStart expected");
-
-        index++;
-        while (index < input.length && input[index] !== this.RecordEnd) {
-            let { value, newIndex } = this.deserializeValue(input, index);
-            result.push(value);
-            index = newIndex;
-            if (input[index] === this.FieldDelimiter)
-                index++;
-        }
-        if (index >= input.length)
-            throw new Error("Invalid format: RecordEnd expected");
-
-        index++;  // point past RecordEnd
-        return { value: result, newIndex: index };
-    },
-
-    readUntil: function (input, index, ...delimiters) {
-        let start = index;
-        while (index < input.length && !delimiters.includes(input[index])) {
-            index++;
-        }
-        return { value: input.substring(start, index), newIndex: index };
     }
-};
 
-// Calculate specialChars and lxdSpecialCharsPattern once and store them
-window.LXD.specialChars = [window.LXD.MetaEnd, window.LXD.RecordStart, window.LXD.RecordEnd, window.LXD.FieldDelimiter, window.LXD.KeyValueSeparator].join('');
-window.LXD.lxdSpecialCharsPattern = new RegExp(`[${window.LXD.specialChars}]`, 'g');
+    // public:
+    return { serialize, deserialize };
+})();
 
 // Export the LXD module for Node.js or CommonJS environments
 //if (typeof module !== 'undefined' && module.exports) {
