@@ -511,8 +511,8 @@ public static class LXD
                 {
                     string key = UnescapeString(ReadUntil(input, ref index, KeyValueSeparator));
                     index++;  // point past KeyValueSeparator
-                    LxdVar value = DeserializeValue(typeof(LxdVar), input, ref index);
-                    dictionary[key] = value;
+                    LxdVar dvalue = DeserializeValue(typeof(LxdVar), input, ref index);
+                    dictionary[key] = dvalue;
                     if (input[index] == FieldDelimiter) index++;  // point past FieldDelimiter to either a RecordEnd or start of next key
                 }
                 index++;  // point past RecordEnd
@@ -524,8 +524,8 @@ public static class LXD
                 index++;  // point past KeyValueSeparator
                 while (input[index] != RecordEnd)
                 {
-                    var value = DeserializeValue(typeof(LxdVar), input, ref index);
-                    list.Add(value);
+                    var dvalue = DeserializeValue(typeof(LxdVar), input, ref index);
+                    list.Add(dvalue);
                     if (input[index] == FieldDelimiter) index++;  // point past FieldDelimiter to either a RecordEnd or type letter prefix
                 }
                 index++; // Move past RecordEnd
