@@ -12,14 +12,13 @@ LXD supports a variety of data types, each with a specific prefix:
 Type | Prefix | Encoded Example | Note
 ---- | ------ | --------------- | ----
 **String** | s | sHello World | 
-**Integer** | i | i123 | 
-**Float** | f | f3.14 | 
+**Number** | n | 3.14 | IEEE 754 double-precision 64-bit floating-point numbers.
 **Boolean** | b | btrue | (values `true` or `false`)
 **Date** | d | d2024-06-16T00:00:00Z | in ISO 8601 format
 **Dictionary** | D | D╾key꞉svalue╼ | with key-value pairs enclosed in record delimiters
 **List** | L | L╾selement1╽selement2╼ | with elements enclosed in record delimiters
 
-Keys in dictionaries are always untyped strings.
+Keys in dictionaries are *always* untyped strings. This is deliberate. If you need otherwise
 
 ### Special Delimiters
 
@@ -42,7 +41,7 @@ LXD supports an optional extensible meta structure for defining types. This stru
 
 LXD Representation:
 ```text
-  D╾LXD꞉D╾type꞉D╾String꞉ss╽Int꞉si╽Float꞉sf╽Boolean꞉sb╽Date꞉sd╽Dictionary꞉sD╽List꞉sL╼╼╼
+  D╾LXD꞉D╾type꞉D╾String꞉ss╽Number:sn╽Boolean꞉sb╽Date꞉sd╽Dictionary꞉sD╽List꞉sL╼╼╼
 ```
   JSON Equivalent:
 ```json
@@ -50,8 +49,7 @@ LXD Representation:
       "LXD": {
           "type": {
               "String": "s",
-              "Int": "i",
-              "Float": "f",
+              "Number": "n",
               "Boolean": "b",
               "Date": "d",
               "Dictionary" : "D",
@@ -114,7 +112,6 @@ Conclusion
 LXD offers a streamlined, text-oriented alternative to JSON for structured data exchange. Its use of uncommon Unicode characters and explicit type prefixes makes it a robust choice for efficient client-server communication. By following best practices for handling escape sequences and defining types, LXD can be an effective tool for structured data serialization.
 
 ### Future
-- Switch from string-only keys in dictionaries.
 - Fully implement 'strict' mode (e.g. the ability to override strictness when deserialising).
 - Full unit tests.
 
