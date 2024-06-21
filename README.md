@@ -16,7 +16,7 @@ Type | Prefix | Encoded Example | Note
 **Boolean** | b | btrue | (values `true` or `false`)
 **Date** | d | d2024-06-16T00:00:00Z | in ISO 8601 format
 **Dictionary** | D | D╾key꞉svalue╼ | with key-value pairs enclosed in record delimiters
-**List** | L | L╾selement1╽selement2╼ | with elements enclosed in record delimiters
+**List** | L | L╾sElement1╽sElement2╼ | with elements enclosed in record delimiters
 
 Keys in dictionaries are *always* untyped strings. This is deliberate. If you need otherwise
 
