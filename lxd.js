@@ -32,7 +32,7 @@ window.LXD = (() => {
             case 'string':
                 return `s${escapeString(value)}`;
             case 'number':
-                return Number.isInteger(value) ? `i${value}` : `f${value}`;
+                return `n${value}`;
             case 'boolean':
                 return `b${value}`;
             case 'object':
@@ -63,16 +63,11 @@ window.LXD = (() => {
                 const str = unescapeString(strData.value);
                 index = strData.newIndex;
                 return { value: str, newIndex: index };
-            case 'i':
-                const intData = readUntil(input, index, FieldDelimiter, RecordEnd);
-                const intValue = parseInt(unescapeString(intData.value), 10);  // base-10
-                index = intData.newIndex;
-                return { value: intValue, newIndex: index };
-            case 'f':
-                const floatData = readUntil(input, index, FieldDelimiter, RecordEnd);
-                const floatValue = parseFloat(unescapeString(floatData.value));
-                index = floatData.newIndex;
-                return { value: floatValue, newIndex: index };
+            case 'n':
+                const numData = readUntil(input, index, FieldDelimiter, RecordEnd);
+                const numValue = parseFloat(unescapeString(numData.value));
+                index = numData.newIndex;
+                return { value: numValue, newIndex: index };
             case 'b':
                 const boolData = readUntil(input, index, FieldDelimiter, RecordEnd);
                 const boolValue = unescapeString(boolData.value) === "true";
