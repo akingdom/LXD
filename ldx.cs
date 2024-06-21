@@ -75,6 +75,7 @@ private object _value;
     }
 
     public static implicit operator LxdVar(string value) => new LxdVar(value);
+    public static implicit operator LxdVar(double value) => new LxdVar(value);
     public static implicit operator LxdVar(int value) => new LxdVar(value);
     public static implicit operator LxdVar(float value) => new LxdVar(value);
     public static implicit operator LxdVar(bool value) => new LxdVar(value);
@@ -83,6 +84,7 @@ private object _value;
     public static implicit operator LxdVar(List<LxdVar> value) => new LxdVar(value);
 
     public static implicit operator string(LxdVar lxdVar) => lxdVar.As<string>();
+    public static implicit operator double(LxdVar lxdVar) => lxdVar.As<double>();
     public static implicit operator int(LxdVar lxdVar) => lxdVar.As<int>();
     public static implicit operator float(LxdVar lxdVar) => lxdVar.As<float>();
     public static implicit operator bool(LxdVar lxdVar) => lxdVar.As<bool>();
@@ -91,6 +93,21 @@ private object _value;
     public static implicit operator List<LxdVar>(LxdVar lxdVar) => lxdVar.As<List<LxdVar>>();
 
     public override string ToString() => Value?.ToString() ?? "null";
+
+    // Custom hash code and equality implementation
+    public override bool Equals(object? obj)
+    {
+        if (obj is LxdVar other)
+        {
+            return Equals(Value, other.Value);
+        }
+        return Equals(Value, obj);
+    }
+
+    public override int GetHashCode()
+    {
+        return Value != null ? Value.GetHashCode() : 0;
+    }
 
     #region IList<LxdVar> AND IDictionary<string, LxdVar> shared implementation
 
@@ -332,6 +349,7 @@ private object _value;
 
 public static class LXD
 {
+    private const char EncodeMark = '〻';   // U+303B
     private const char RecordStart = '╾';   // U+257E
     private const char RecordEnd = '╼';     // U+257C
     private const char FieldDelimiter = '╽';// U+257D
@@ -356,8 +374,9 @@ public static class LXD
         else switch (value)
         {
             case string s: SerializeString(s, sb); break;
-            case int i: SerializeInt(i, sb); break;
-            case float f: SerializeFloat(f, sb); break;
+            case double d: SerializeNumber(d, sb); break;
+            case int i: SerializeNumber(i, sb); break;
+            case float f: SerializeNumber(f, sb); break;
             case bool b: SerializeBool(b, sb); break;
             case DateTime dt: SerializeDateTime(dt, sb); break;
             case IList list: SerializeList(list, sb); break;
@@ -417,18 +436,29 @@ public static class LXD
         sb.Append(b ? "true" : "false");
     }
 
-    private static void SerializeFloat(float f, StringBuilder sb)
+    private static void SerializeNumber(object n, StringBuilder sb)
     {
-        sb.Append('f');
-        sb.Append(f.ToString(CultureInfo.InvariantCulture));
+        switch (n)
+        {
+            case double d:
+                sb.Append('n');
+                sb.Append(d.ToString("R", CultureInfo.InvariantCulture));
+                break;
+            case float f:
+                sb.Append('n');
+                sb.Append(f.ToString("G9", CultureInfo.InvariantCulture));
+                break;
+            case int i:
+                sb.Append('n');
+                sb.Append(i.ToString("G17", CultureInfo.InvariantCulture));
+                break;
+            default:
+                string type = n?.GetType().ToString() ?? "null";
+                throw new NotSupportedException($"Unsupported type: {type}");
+        }
     }
 
-    private static void SerializeInt(int i, StringBuilder sb)
-    {
-        sb.Append('i');
-        sb.Append(i.ToString(CultureInfo.InvariantCulture));
-    }
-
+    
     private static void SerializeString(string s, StringBuilder sb)
     {
         sb.Append('s');
@@ -452,12 +482,20 @@ public static class LXD
             case 's':
                 index++; // Skip type letter prefix
                 return new LxdVar(UnescapeString(ReadUntil(input, ref index, FieldDelimiter, RecordEnd)));
-            case 'i':
+            case 'n':
                 index++; // Skip type letter prefix
-                return new LxdVar(int.Parse(ReadUntil(input, ref index, FieldDelimiter, RecordEnd), CultureInfo.InvariantCulture));
-            case 'f':
-                index++; // Skip type letter prefix
-                return new LxdVar(float.Parse(ReadUntil(input, ref index, FieldDelimiter, RecordEnd), CultureInfo.InvariantCulture));
+                double doubleValue = double.Parse(ReadUntil(input, ref index, FieldDelimiter, RecordEnd), CultureInfo.InvariantCulture);
+                object value;
+                // Check if it should be converted back to int or float
+                if (Math.Abs(doubleValue % 1) < double.Epsilon * 100)
+                {
+                    value = (int)doubleValue; // Convert to int if effectively an integer
+                }
+                else
+                {
+                    value = (float)doubleValue; // Otherwise, keep it as float
+                }
+                return new LxdVar(value);
             case 'b':
                 index++; // Skip type letter prefix
                 return new LxdVar(ReadUntil(input, ref index, FieldDelimiter, RecordEnd) == "true");
