@@ -105,10 +105,13 @@ Compactness | More verbose due to brackets and commas | More compact due to spec
 #### Consistent Handling
 Ensure consistent handling of escape sequences during serialization and deserialization to maintain data integrity.
 
+#### ContentType
+The recommended MIME Type is `text/vnd.lxd; charset=utf-8`.
+
 ### Type Definitions
 Use the optional meta structure to define types at the beginning of communication for clarity and consistency.
 
-Conclusion
+### Conclusion
 LXD offers a streamlined, text-oriented alternative to JSON for structured data exchange. Its use of uncommon Unicode characters and explicit type prefixes makes it a robust choice for efficient client-server communication. By following best practices for handling escape sequences and defining types, LXD can be an effective tool for structured data serialization.
 
 ### Future
