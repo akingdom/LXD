@@ -349,11 +349,11 @@ private object _value;
 
 public static class LXD
 {
-    private const char EncodeMark = '〻';   // U+303B
     private const char RecordStart = '╾';   // U+257E
     private const char RecordEnd = '╼';     // U+257C
     private const char FieldDelimiter = '╽';// U+257D
     private const char KeyValueSeparator = '꞉'; // U+A789
+    public static readonly string mimeType = "text/vnd.lxd; charset=utf-8";
     public static bool Debug = false;
     public static string Serialize<T>(T value, bool? debug = null) where T : notnull
     {
