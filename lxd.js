@@ -14,7 +14,6 @@ window.LXD = (() => {
     RecordEnd = '\u257C';         // U+257C BOX DRAWINGS LIGHT LEFT AND RIGHT
     FieldDelimiter = '\u257D';    // U+257D BOX DRAWINGS LIGHT UP
     KeyValueSeparator = '\uA789'; // U+A789 MODIFIER LETTER COLON
-
     const specialChars = [RecordStart, RecordEnd, FieldDelimiter, KeyValueSeparator];
     const specialCharsMap = {
         '\u257E': '\\u257E',
@@ -22,7 +21,8 @@ window.LXD = (() => {
         '\u257D': '\\u257D',
         '\uA789': '\\uA789'
     };
-
+    mimeType = "text/vnd.lxd; charset=utf-8";
+    
     function serialize(value) {
         return serializeValue(value);
     }
@@ -167,7 +167,7 @@ window.LXD = (() => {
     }
 
     // public:
-    return { serialize, deserialize };
+    return { mimeType, serialize, deserialize };
 })();
 
 // Export the LXD module for Node.js or CommonJS environments
