@@ -12,7 +12,7 @@ LXD supports a variety of data types, each with a specific prefix:
 Type | Prefix | Encoded Example | Note
 ---- | ------ | --------------- | ----
 **String** | s | sHello World | 
-**Number** | n | 3.14 | IEEE 754 double-precision 64-bit floating-point numbers.
+**Number** | n | n3.14 | IEEE 754 double-precision 64-bit floating-point numbers.
 **Boolean** | b | btrue | (values `true` or `false`)
 **Date** | d | d2024-06-16T00:00:00Z | in ISO 8601 format
 **Dictionary** | D | D╾key꞉svalue╼ | with key-value pairs enclosed in record delimiters
@@ -90,7 +90,7 @@ Type Information | Inferred or requires additional context | Explicitly included
 Delimiters | Common characters (e.g., {, }, [, ], :, ,) | Uncommon Unicode characters (e.g., ╾, ╼, ╽, ꞉)
 Escape Sequences | Requires escaping of quotes, backslashes, and control characters | Uses \uXXXX format for escaping delimiters
 Structure | Arrays and objects | Lists and dictionaries
-Date Format | ISO 8601 (string) | ISO 8601 with prefix d
+Date Format | ISO 8601 (string) | ISO 8601 (string)
 Compactness | More verbose due to brackets and commas | More compact due to specialized delimiters
 
 ### Advantages of LXD over JSON
